@@ -35,10 +35,10 @@ class Config:
 
     # Stage configs
     s01: StageConfig = field(default_factory=lambda: StageConfig(
-        resolution=512, batch_size=8, lr=1e-4, epochs=50, stage="s01"
+        resolution=512, batch_size=4, lr=1e-4, epochs=50, stage="s01"
     ))
     s02: StageConfig = field(default_factory=lambda: StageConfig(
-        resolution=768, batch_size=4, lr=5e-5, epochs=15, stage="s02"
+        resolution=768, batch_size=2, lr=5e-5, epochs=15, stage="s02"
     ))
 
     # Loss weights
