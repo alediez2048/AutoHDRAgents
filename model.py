@@ -137,8 +137,9 @@ class Decoder(nn.Module):
         self.final_up = nn.Upsample(scale_factor=4, mode="bilinear", align_corners=True)
         self.final_conv = nn.Conv2d(64, 2, kernel_size=1)
 
-        # Initialise final conv close to zero so displacement starts near identity
-        nn.init.zeros_(self.final_conv.weight)
+        # Initialise final conv with small random weights so gradients can flow
+        # (exact zeros trap the model at identity displacement)
+        nn.init.normal_(self.final_conv.weight, mean=0.0, std=0.001)
         nn.init.zeros_(self.final_conv.bias)
 
     def forward(

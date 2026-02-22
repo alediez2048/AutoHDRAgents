@@ -61,7 +61,7 @@ class Config:
     grad_accum_steps: int = 4
 
     # Encoder freeze
-    encoder_freeze_epochs: int = 5
+    encoder_freeze_epochs: int = 1
 
     # Early stopping
     early_stopping_patience: int = 5
