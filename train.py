@@ -408,9 +408,9 @@ class Trainer:
 
             # Save checkpoint if composite improved
             if composite > self.best_composite:
+                self.save_checkpoint(epoch, metrics)
                 self.best_composite = composite
                 self.epochs_without_improvement = 0
-                self.save_checkpoint(epoch, metrics)
             else:
                 self.epochs_without_improvement += 1
 
