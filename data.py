@@ -337,18 +337,16 @@ def compute_composite(
     edge: float,
     ssim: float,
     pixel_mae: float,
-    line_proxy: float = 0.5,
-    grad_proxy: float = 0.5,
 ) -> float:
-    """Weighted composite quality score.
+    """Weighted composite quality score using real metrics only.
 
-    Weights: 0.40 * edge  +  0.22 * line_proxy  +  0.18 * grad_proxy
-             + 0.15 * ssim  +  0.05 * (1 - pixel_mae)
+    Simplified from the competition formula (which includes line/gradient proxies
+    we can't compute locally). Uses only the three metrics we can actually measure,
+    reweighted to sum to 1.0:
+        0.55 * edge + 0.30 * ssim + 0.15 * (1 - pixel_mae)
     """
     return (
-        0.40 * edge
-        + 0.22 * line_proxy
-        + 0.18 * grad_proxy
-        + 0.15 * ssim
-        + 0.05 * (1.0 - pixel_mae)
+        0.55 * edge
+        + 0.30 * ssim
+        + 0.15 * (1.0 - pixel_mae)
     )

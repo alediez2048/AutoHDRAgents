@@ -57,6 +57,9 @@ class Config:
     # Gradient clipping
     grad_clip_max_norm: float = 1.0
 
+    # Gradient accumulation (effective batch = batch_size * grad_accum_steps)
+    grad_accum_steps: int = 2
+
     # Encoder freeze
     encoder_freeze_epochs: int = 5
 

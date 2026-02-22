@@ -38,7 +38,11 @@ def not_saturated(image: np.ndarray) -> bool:
 
 
 def edge_density_ok(output_image: np.ndarray, input_image: np.ndarray) -> bool:
-    """Return True if output edge density >= 50% of input edge density."""
+    """Return True if output edge density >= 30% of input edge density.
+
+    Threshold lowered from 50% to 30% to avoid false fallbacks on smooth/sky-heavy
+    images where valid lens correction naturally reduces edge energy.
+    """
     out_gray = cv2.cvtColor(output_image, cv2.COLOR_RGB2GRAY) if output_image.ndim == 3 else output_image
     in_gray = cv2.cvtColor(input_image, cv2.COLOR_RGB2GRAY) if input_image.ndim == 3 else input_image
 
@@ -50,7 +54,7 @@ def edge_density_ok(output_image: np.ndarray, input_image: np.ndarray) -> bool:
     in_sobel_y = cv2.Sobel(in_gray, cv2.CV_64F, 0, 1, ksize=3)
     in_edges = np.abs(in_sobel_x).sum() + np.abs(in_sobel_y).sum()
 
-    return out_edges > 0.5 * in_edges
+    return out_edges > 0.3 * in_edges
 
 
 def dimensions_match(output: np.ndarray, original_h: int, original_w: int) -> bool:

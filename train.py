@@ -108,10 +108,14 @@ class Trainer:
     # ------------------------------------------------------------------
 
     def train_one_epoch(self) -> float:
-        """Run one training epoch. Returns average loss."""
+        """Run one training epoch. Returns average loss.
+
+        Supports gradient accumulation (cfg.grad_accum_steps) to simulate
+        larger effective batch sizes on memory-constrained GPUs.
+        """
         self.model.train()
 
-        # Encoder freeze logic
+        # Encoder freeze logic (epoch-level, not per-step)
         if self.current_epoch < self.cfg.encoder_freeze_epochs:
             self.model.freeze_encoder()
         else:
@@ -119,32 +123,42 @@ class Trainer:
 
         running_loss = 0.0
         num_batches = 0
+        accum_steps = getattr(self.cfg, 'grad_accum_steps', 1)
 
-        for distorted, target in self.train_loader:
+        self.optimizer.zero_grad()
+
+        for batch_idx, (distorted, target) in enumerate(self.train_loader):
             distorted = distorted.to(self.device, non_blocking=True)
             target = target.to(self.device, non_blocking=True)
 
             with torch.amp.autocast("cuda", enabled=self.cfg.amp_enabled):
                 corrected, displacement = self.model(distorted)
                 total_loss, loss_dict = self.loss_fn(corrected, target)
+                # Scale loss by accumulation steps for correct gradient magnitude
+                scaled_loss = total_loss / accum_steps
 
-            self.scaler.scale(total_loss).backward()
-            self.scaler.unscale_(self.optimizer)
-            nn.utils.clip_grad_norm_(
-                self.model.parameters(), self.cfg.grad_clip_max_norm
-            )
-            self.scaler.step(self.optimizer)
-            self.scaler.update()
-            self.optimizer.zero_grad()
+            self.scaler.scale(scaled_loss).backward()
+
+            # Step optimizer every accum_steps batches (or on last batch)
+            if (batch_idx + 1) % accum_steps == 0 or (batch_idx + 1) == len(self.train_loader):
+                self.scaler.unscale_(self.optimizer)
+                nn.utils.clip_grad_norm_(
+                    self.model.parameters(), self.cfg.grad_clip_max_norm
+                )
+                self.scaler.step(self.optimizer)
+                self.scaler.update()
+                self.optimizer.zero_grad()
 
             running_loss += total_loss.item()
             num_batches += 1
 
             # Logging every 50 steps
             if self.global_step % 50 == 0:
+                eff_bs = distorted.shape[0] * accum_steps
                 parts = " | ".join(f"{k}: {v:.4f}" for k, v in loss_dict.items())
                 print(
                     f"  [step {self.global_step}] loss: {total_loss.item():.4f} | {parts}"
+                    + (f" | eff_bs={eff_bs}" if accum_steps > 1 else "")
                 )
 
             # Periodic checkpoint
