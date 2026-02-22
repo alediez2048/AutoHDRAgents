@@ -84,10 +84,11 @@ class Trainer:
             weight_decay=cfg.weight_decay,
         )
 
-        # Scheduler
+        # Scheduler: 1-epoch linear warmup then cosine decay
         self.scheduler = CosineAnnealingLR(
             self.optimizer, T_max=self.stage_cfg.epochs
         )
+        self.warmup_epochs = 1
 
         # AMP scaler
         self.scaler = torch.amp.GradScaler("cuda", enabled=cfg.amp_enabled)
@@ -133,7 +134,7 @@ class Trainer:
 
             with torch.amp.autocast("cuda", enabled=self.cfg.amp_enabled):
                 corrected, displacement = self.model(distorted)
-                total_loss, loss_dict = self.loss_fn(corrected, target)
+                total_loss, loss_dict = self.loss_fn(corrected, target, displacement=displacement)
                 # Scale loss by accumulation steps for correct gradient magnitude
                 scaled_loss = total_loss / accum_steps
 
@@ -171,7 +172,14 @@ class Trainer:
 
             self.global_step += 1
 
-        self.scheduler.step()
+        # LR scheduling: linear warmup for first epoch(s), then cosine
+        if self.current_epoch < self.warmup_epochs:
+            warmup_factor = (self.current_epoch + 1) / self.warmup_epochs
+            for pg in self.optimizer.param_groups:
+                pg['lr'] = self.stage_cfg.lr * warmup_factor
+        else:
+            self.scheduler.step()
+
         avg_loss = running_loss / max(num_batches, 1)
         return avg_loss
 

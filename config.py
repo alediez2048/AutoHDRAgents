@@ -23,6 +23,7 @@ class LossWeights:
     ssim: float = 0.20
     l1_pixel: float = 0.10
     perceptual: float = 0.10
+    displacement_smoothness: float = 0.05
 
 
 @dataclass

@@ -38,9 +38,9 @@ def not_saturated(image: np.ndarray) -> bool:
 
 
 def edge_density_ok(output_image: np.ndarray, input_image: np.ndarray) -> bool:
-    """Return True if output edge density >= 30% of input edge density.
+    """Return True if output edge density >= 15% of input edge density.
 
-    Threshold lowered from 50% to 30% to avoid false fallbacks on smooth/sky-heavy
+    Threshold lowered from 30% to 15% to avoid false fallbacks on smooth/sky-heavy
     images where valid lens correction naturally reduces edge energy.
     """
     out_gray = cv2.cvtColor(output_image, cv2.COLOR_RGB2GRAY) if output_image.ndim == 3 else output_image
@@ -54,7 +54,7 @@ def edge_density_ok(output_image: np.ndarray, input_image: np.ndarray) -> bool:
     in_sobel_y = cv2.Sobel(in_gray, cv2.CV_64F, 0, 1, ksize=3)
     in_edges = np.abs(in_sobel_x).sum() + np.abs(in_sobel_y).sum()
 
-    return out_edges > 0.3 * in_edges
+    return out_edges > 0.15 * in_edges
 
 
 def dimensions_match(output: np.ndarray, original_h: int, original_w: int) -> bool:
@@ -154,8 +154,62 @@ class InferencePipeline:
         print(f"  Device: {self.device}")
         print(f"  Model resolution: {self.model_resolution}")
 
+    def _forward_tta(self, resized: np.ndarray) -> np.ndarray:
+        """Run inference with D4 test-time augmentation (4 geometric transforms).
+
+        Averages displacement fields from original, H-flip, V-flip, and H+V-flip,
+        then applies the averaged displacement to produce the final output.
+        """
+        H, W = resized.shape[:2]
+
+        def to_tensor(img: np.ndarray) -> torch.Tensor:
+            return torch.from_numpy(img).float().permute(2, 0, 1).unsqueeze(0).to(self.device) / 255.0
+
+        # Original
+        t_orig = to_tensor(resized)
+        with torch.no_grad():
+            _, disp_orig = self.model(t_orig)
+
+        displacements = [disp_orig]
+
+        # H-flip
+        h_flip = np.ascontiguousarray(resized[:, ::-1, :])
+        with torch.no_grad():
+            _, disp_h = self.model(to_tensor(h_flip))
+        # Undo H-flip on displacement: flip spatially and negate x-component
+        disp_h = torch.flip(disp_h, [3])
+        disp_h[:, 0, :, :] *= -1
+        displacements.append(disp_h)
+
+        # V-flip
+        v_flip = np.ascontiguousarray(resized[::-1, :, :])
+        with torch.no_grad():
+            _, disp_v = self.model(to_tensor(v_flip))
+        disp_v = torch.flip(disp_v, [2])
+        disp_v[:, 1, :, :] *= -1
+        displacements.append(disp_v)
+
+        # H+V-flip
+        hv_flip = np.ascontiguousarray(resized[::-1, ::-1, :])
+        with torch.no_grad():
+            _, disp_hv = self.model(to_tensor(hv_flip))
+        disp_hv = torch.flip(disp_hv, [2, 3])
+        disp_hv[:, 0, :, :] *= -1
+        disp_hv[:, 1, :, :] *= -1
+        displacements.append(disp_hv)
+
+        # Median-average displacement fields for robustness
+        stacked = torch.stack(displacements, dim=0)  # (4, 1, 2, H, W)
+        avg_disp = stacked.median(dim=0).values
+
+        # Warp original image with averaged displacement
+        with torch.no_grad():
+            corrected = self.model.warp_layer(t_orig, avg_disp)
+
+        return corrected.squeeze(0).cpu().numpy().transpose(1, 2, 0)
+
     def process_single_image(self, input_path: str, output_path: str) -> bool:
-        """Process a single image through the model.
+        """Process a single image through the model with D4 TTA.
 
         Returns True on success, False if fallback was triggered.
         """
@@ -172,16 +226,8 @@ class InferencePipeline:
         # Resize to model resolution (square)
         resized = cv2.resize(rgb, (self.model_resolution, self.model_resolution), interpolation=cv2.INTER_LINEAR)
 
-        # Convert to tensor [0, 1], add batch dim, move to device
-        tensor = torch.from_numpy(resized).float().permute(2, 0, 1) / 255.0  # (C, H, W)
-        tensor = tensor.unsqueeze(0).to(self.device)  # (1, C, H, W)
-
-        # Inference
-        with torch.no_grad():
-            corrected, displacement = self.model(tensor)
-
-        # Remove batch dim, convert to numpy (C, H, W) -> (H, W, C)
-        corrected_np = corrected.squeeze(0).cpu().numpy().transpose(1, 2, 0)  # (H, W, C)
+        # Inference with D4 TTA
+        corrected_np = self._forward_tta(resized)  # (H, W, C)
 
         # Resize back to original dimensions
         corrected_np = cv2.resize(corrected_np, (original_w, original_h), interpolation=cv2.INTER_LINEAR)

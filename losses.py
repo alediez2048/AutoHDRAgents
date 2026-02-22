@@ -123,6 +123,15 @@ class PerceptualLoss(nn.Module):
         return loss / len(feats_pred)
 
 
+class DisplacementSmoothnessLoss(nn.Module):
+    """Penalises spatial discontinuities in the displacement field."""
+
+    def forward(self, displacement: torch.Tensor) -> torch.Tensor:
+        dy = displacement[:, :, 1:, :] - displacement[:, :, :-1, :]
+        dx = displacement[:, :, :, 1:] - displacement[:, :, :, :-1]
+        return (dx.pow(2).mean() + dy.pow(2).mean()) * 0.5
+
+
 class CompositeLoss(nn.Module):
     """Weighted sum of all loss components."""
 
@@ -139,11 +148,15 @@ class CompositeLoss(nn.Module):
         self.ssim_loss = SSIMLoss()
         self.l1_loss = L1PixelLoss()
         self.perceptual_loss = PerceptualLoss()
+        self.disp_smooth_loss = DisplacementSmoothnessLoss()
 
         self.to(device)
 
     def forward(
-        self, pred: torch.Tensor, target: torch.Tensor
+        self,
+        pred: torch.Tensor,
+        target: torch.Tensor,
+        displacement: Optional[torch.Tensor] = None,
     ) -> Tuple[torch.Tensor, Dict[str, float]]:
         l_edge = self.edge_loss(pred, target)
         l_grad = self.grad_loss(pred, target)
@@ -166,5 +179,10 @@ class CompositeLoss(nn.Module):
             "l1": l_l1.item(),
             "perceptual": l_perc.item(),
         }
+
+        if displacement is not None:
+            l_smooth = self.disp_smooth_loss(displacement)
+            total = total + self.weights.displacement_smoothness * l_smooth
+            components["disp_smooth"] = l_smooth.item()
 
         return total, components
