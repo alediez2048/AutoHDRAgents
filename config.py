@@ -35,10 +35,10 @@ class Config:
 
     # Stage configs
     s01: StageConfig = field(default_factory=lambda: StageConfig(
-        resolution=512, batch_size=4, lr=1e-4, epochs=50, stage="s01"
+        resolution=512, batch_size=2, lr=1e-4, epochs=50, stage="s01"
     ))
     s02: StageConfig = field(default_factory=lambda: StageConfig(
-        resolution=768, batch_size=2, lr=5e-5, epochs=15, stage="s02"
+        resolution=768, batch_size=1, lr=5e-5, epochs=15, stage="s02"
     ))
 
     # Loss weights
@@ -58,7 +58,7 @@ class Config:
     grad_clip_max_norm: float = 1.0
 
     # Gradient accumulation (effective batch = batch_size * grad_accum_steps)
-    grad_accum_steps: int = 2
+    grad_accum_steps: int = 4
 
     # Encoder freeze
     encoder_freeze_epochs: int = 5

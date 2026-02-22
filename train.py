@@ -245,11 +245,14 @@ class Trainer:
 
     @torch.no_grad()
     def save_visual_comparison(self, epoch: int, num_samples: int = 3) -> None:
-        """Save a figure with best and worst predictions from the val set."""
+        """Save a figure with best and worst predictions from a small val sample."""
         self.model.eval()
         results: list[tuple[float, np.ndarray, np.ndarray, np.ndarray]] = []
 
-        for distorted, target in self.val_loader:
+        # Only check first 10 batches to avoid OOM from storing all val images
+        for batch_idx, (distorted, target) in enumerate(self.val_loader):
+            if batch_idx >= 10:
+                break
             distorted = distorted.to(self.device, non_blocking=True)
             target = target.to(self.device, non_blocking=True)
 
@@ -262,6 +265,9 @@ class Trainer:
                 d = distorted[i].clamp(0, 1).cpu().numpy().transpose(1, 2, 0)
                 mae = float(np.mean(np.abs(p - t)))
                 results.append((mae, d, p, t))
+
+            del distorted, target, corrected
+            torch.cuda.empty_cache()
 
         # Sort by MAE: best = lowest, worst = highest
         results.sort(key=lambda x: x[0])
