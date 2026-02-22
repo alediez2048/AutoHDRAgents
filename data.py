@@ -167,14 +167,27 @@ def _match_dirs(dist_dir: Path, corr_dir: Path) -> List[Tuple[str, str]]:
 
 
 def _match_naming_convention(directory: Path) -> List[Tuple[str, str]]:
-    """Match ``<stem>_distorted.<ext>`` with ``<stem>_corrected.<ext>``."""
+    """Match paired images by naming convention.
+
+    Supported patterns (distorted -> corrected):
+    - ``*_distorted.*`` / ``*_corrected.*``
+    - ``*_generated.*`` / ``*_original.*``  (AutoHDR Kaggle competition format)
+    """
     files = {f.name: f for f in directory.iterdir() if f.is_file() and _is_image(str(f))}
     pairs: List[Tuple[str, str]] = []
+
     for name, fpath in sorted(files.items()):
+        # Pattern 1: _distorted / _corrected
         if "_distorted" in name:
-            stem_part = name.replace("_distorted", "_corrected")
-            if stem_part in files:
-                pairs.append((str(fpath), str(files[stem_part])))
+            partner = name.replace("_distorted", "_corrected")
+            if partner in files:
+                pairs.append((str(fpath), str(files[partner])))
+        # Pattern 2: _generated (distorted) / _original (corrected)
+        elif "_generated" in name:
+            partner = name.replace("_generated", "_original")
+            if partner in files:
+                pairs.append((str(fpath), str(files[partner])))
+
     return pairs
 
 

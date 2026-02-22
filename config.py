@@ -63,17 +63,18 @@ class Config:
     # Early stopping
     early_stopping_patience: int = 5
 
-    # Data paths
-    data_dir: str = "data"
-    train_csv: str = "data/train.csv"
-    val_csv: str = "data/val.csv"
+    # Data paths (Kaggle: /kaggle/input/automatic-lens-correction)
+    data_dir: str = "/kaggle/input/automatic-lens-correction/lens-correction-train-cleaned"
+    test_dir: str = "/kaggle/input/automatic-lens-correction/test-originals"
+    train_csv: str = "/kaggle/working/train.csv"
+    val_csv: str = "/kaggle/working/val.csv"
 
-    # Checkpoint directory (Google Drive)
-    checkpoint_dir: str = "/content/drive/MyDrive/autohdr_checkpoints"
+    # Checkpoint directory
+    checkpoint_dir: str = "/kaggle/working/checkpoints"
 
     # Output and logging
-    output_dir: str = "outputs"
-    log_dir: str = "logs"
+    output_dir: str = "/kaggle/working/outputs"
+    log_dir: str = "/kaggle/working/logs"
 
     # Mixed precision
     amp_enabled: bool = True
