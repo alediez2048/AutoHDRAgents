@@ -182,9 +182,10 @@ def _match_naming_convention(directory: Path) -> List[Tuple[str, str]]:
             partner = name.replace("_distorted", "_corrected")
             if partner in files:
                 pairs.append((str(fpath), str(files[partner])))
-        # Pattern 2: _generated (distorted) / _original (corrected)
-        elif "_generated" in name:
-            partner = name.replace("_generated", "_original")
+        # Pattern 2: _original (distorted) / _generated (corrected)
+        # In AutoHDR competition: original=distorted input, generated=corrected GT
+        elif "_original" in name:
+            partner = name.replace("_original", "_generated")
             if partner in files:
                 pairs.append((str(fpath), str(files[partner])))
 
