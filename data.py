@@ -39,8 +39,8 @@ def _build_distorted_only_augmentation() -> A.Compose:
     return A.Compose(
         [
             A.RandomBrightnessContrast(brightness_limit=0.2, contrast_limit=0.2, p=0.5),
-            A.GaussNoise(var_limit=(10, 50), p=0.3),
-            A.ImageCompression(quality_lower=70, quality_upper=100, p=0.3),
+            A.GaussNoise(std_range=(10, 50), p=0.3),
+            A.ImageCompression(quality_range=(70, 100), p=0.3),
         ]
     )
 

@@ -195,9 +195,13 @@ class InferencePipeline:
             identity_fallback(input_path, output_path)
             return False
 
-        # Save as PNG (convert RGB -> BGR for cv2)
+        # Save (convert RGB -> BGR for cv2)
         output_bgr = cv2.cvtColor(output_uint8, cv2.COLOR_RGB2BGR)
-        cv2.imwrite(output_path, output_bgr)
+        # Use JPEG quality 95 for .jpg files
+        if output_path.lower().endswith(('.jpg', '.jpeg')):
+            cv2.imwrite(output_path, output_bgr, [cv2.IMWRITE_JPEG_QUALITY, 95])
+        else:
+            cv2.imwrite(output_path, output_bgr)
         return True
 
     def process_all(self, test_dir: str, output_dir: str) -> Dict:
@@ -225,7 +229,8 @@ class InferencePipeline:
         print(f"Processing {total} images from {test_dir}")
 
         for i, img_path in enumerate(image_paths):
-            filename = Path(img_path).stem + ".png"
+            # Keep original extension (.jpg) — competition expects matching filenames
+            filename = Path(img_path).name
             output_path = os.path.join(output_dir, filename)
 
             success = self.process_single_image(img_path, output_path)
